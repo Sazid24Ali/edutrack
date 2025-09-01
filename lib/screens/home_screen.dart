@@ -1,3 +1,4 @@
+import 'package:edutrack/screens/alarm_screen.dart';
 import 'package:flutter/material.dart';
 import 'planner_screen.dart';
 import 'study_files_screen.dart';
@@ -36,7 +37,10 @@ class HomeScreen extends StatelessWidget {
             ),
             ElevatedButton.icon(
               onPressed: () {
-                // Navigate to alarm settings screen
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AlarmScreen()),
+                );
               },
               icon: const Icon(Icons.alarm),
               label: const Text('Alarm'),
@@ -57,3 +61,5 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
+
