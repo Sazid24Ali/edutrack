@@ -54,15 +54,30 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Future<void> _loadSavedPlans() async {
     final prefs = await SharedPreferences.getInstance();
     final savedPlansJson = prefs.getStringList('savedPlans') ?? [];
-    // print(savedPlansJson);
-    final loadedPlans = savedPlansJson.map((planStr) {
-      final jsonMap = Map<String, dynamic>.from(jsonDecode(planStr));
-      return PlanData.fromJson(jsonMap);
-    }).toList();
+
+    final loadedPlans = <PlanData>[];
+
+    for (var planStr in savedPlansJson) {
+      try {
+        final decoded = jsonDecode(planStr);
+
+        if (decoded is Map<String, dynamic>) {
+          // Normal PlanData
+          loadedPlans.add(PlanData.fromJson(decoded));
+        } else if (decoded is List) {
+          // Old data: list of DayPlan, wrap it in PlanData with default name/alarm
+          final days = decoded.map((d) => DayPlan.fromJson(d)).toList();
+          loadedPlans.add(PlanData(name: "Untitled Plan", days: days));
+        } else {
+          debugPrint('Skipped unknown plan data type: $decoded');
+        }
+      } catch (e) {
+        debugPrint('Error decoding plan: $e');
+      }
+    }
 
     setState(() {
       savedPlans = loadedPlans;
-      print(savedPlans);
     });
   }
 
