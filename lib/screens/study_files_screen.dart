@@ -508,6 +508,7 @@ class _FolderContentsScreenState extends State<FolderContentsScreen> {
               } else if (value == 'delete') {
                 await widget.deleteFolder(widget.folder);
                 Navigator.pop(context); // close folder screen after deletion
+                await widget.saveCallback();
               }
             },
           ),

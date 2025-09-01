@@ -1,45 +1,156 @@
+// lib/screens/planner_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'plan_preview_screen.dart';
 import 'package:intl/intl.dart';
-import "planning_screen.dart";
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:edutrack/models/plan_data.dart';
+import 'package:edutrack/models/plan_day.dart';
+
+/// Topic model used inside DayPlan
+class TopicModel {
+  String name;
+  int estimatedMinutes;
+  bool done;
+
+  TopicModel({
+    required this.name,
+    required this.estimatedMinutes,
+    this.done = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'estimatedMinutes': estimatedMinutes,
+    'done': done,
+  };
+
+  factory TopicModel.fromJson(Map<String, dynamic> json) => TopicModel(
+    name: json['name'] ?? 'Untitled',
+    estimatedMinutes: (json['estimatedMinutes'] ?? 0) is int
+        ? json['estimatedMinutes']
+        : (json['estimatedMinutes'] as num).toInt(),
+    done: json['done'] ?? false,
+  );
+}
+
+/// Day plan containing a date and topics for that day
+// class DayPlan {
+//   DateTime date;
+//   List<TopicModel> topics;
+//   int totalMinutes;
+
+//   DayPlan({
+//     required this.date,
+//     required this.topics,
+//     required this.totalMinutes,
+//   });
+
+//   Map<String, dynamic> toJson() => {
+//     'date': date.toIso8601String(),
+//     'totalMinutes': totalMinutes,
+//     'topics': topics.map((t) => t.toJson()).toList(),
+//   };
+
+//   factory DayPlan.fromJson(dynamic json) {
+//     // json might be Map or List (old formats) — handle robustly
+//     if (json is Map<String, dynamic>) {
+//       final topicsJson = (json['topics'] as List<dynamic>?) ?? <dynamic>[];
+//       return DayPlan(
+//         date:
+//             DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
+//         totalMinutes: (json['totalMinutes'] ?? 0) is int
+//             ? json['totalMinutes']
+//             : (json['totalMinutes'] as num).toInt(),
+//         topics: topicsJson
+//             .map<TopicModel>((t) {
+//               if (t is Map<String, dynamic>) return TopicModel.fromJson(t);
+//               return TopicModel.fromJson(Map<String, dynamic>.from(t));
+//             })
+//             .toList()
+//             .cast<TopicModel>(),
+//       );
+//     } else if (json is List) {
+//       // old list-of-topics format -> create DayPlan with today's date
+//       final topics = json.map<TopicModel>((t) {
+//         if (t is Map<String, dynamic>) return TopicModel.fromJson(t);
+//         return TopicModel.fromJson(Map<String, dynamic>.from(t));
+//       }).toList();
+//       final total = topics.fold<int>(0, (s, t) => s + t.estimatedMinutes);
+//       return DayPlan(date: DateTime.now(), topics: topics, totalMinutes: total);
+//     } else {
+//       // fallback
+//       return DayPlan(date: DateTime.now(), topics: [], totalMinutes: 0);
+//     }
+//   }
+// }
+
+/// Plan container (name + days + alarm time)
+// class PlanData {
+//   String name;
+//   List<DayPlan> days;
+//   int alarmHour;
+//   int alarmMinute;
+
+//   PlanData({
+//     required this.name,
+//     required this.days,
+//     this.alarmHour = 8,
+//     this.alarmMinute = 0,
+//   });
+
+//   Map<String, dynamic> toJson() => {
+//     'name': name,
+//     'days': days.map((d) => d.toJson()).toList(),
+//     'alarmHour': alarmHour,
+//     'alarmMinute': alarmMinute,
+//   };
+
+//   factory PlanData.fromJson(Map<String, dynamic> json) {
+//     final daysJson = json['days'] as List<dynamic>? ?? <dynamic>[];
+//     final days = daysJson.map((d) => DayPlan.fromJson(d)).toList();
+//     return PlanData(
+//       name: json['name'] ?? 'Untitled Plan',
+//       days: days,
+//       alarmHour: json['alarmHour'] ?? 8,
+//       alarmMinute: json['alarmMinute'] ?? 0,
+//     );
+//   }
+// }
 
 class PlannerScreen extends StatefulWidget {
   const PlannerScreen({super.key});
 
   @override
   State<PlannerScreen> createState() => _PlannerScreenState();
-}
 
-class PlanData {
-  String name;
-  List<DayPlan> days;
-  int alarmHour;
-  int alarmMinute;
+  /// Return current plan stored under 'currentPlan' (or null)
+  static Future<PlanData?> getCurrentPlanData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString('currentPlan');
+    if (str == null) return null;
+    try {
+      final decoded = jsonDecode(str);
+      if (decoded is Map<String, dynamic>) {
+        return PlanData.fromJson(decoded);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
+  }
 
-  PlanData({
-    required this.name,
-    required this.days,
-    this.alarmHour = 8,
-    this.alarmMinute = 0,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'days': days.map((d) => d.toJson()).toList(),
-    'alarmHour': alarmHour,
-    'alarmMinute': alarmMinute,
-  };
-
-  factory PlanData.fromJson(Map<String, dynamic> json) => PlanData(
-    name: json['name'],
-    days: (json['days'] as List<dynamic>)
-        .map((d) => DayPlan.fromJson(d))
-        .toList(),
-    alarmHour: json['alarmHour'] ?? 8,
-    alarmMinute: json['alarmMinute'] ?? 0,
-  );
+  /// Calculate progress across all days/topics (0.0..1.0)
+  static double calculateProgress(PlanData plan) {
+    int total = 0;
+    int done = 0;
+    for (final d in plan.days) {
+      for (final t in d.topics) {
+        total++;
+        if (t.done) done++;
+      }
+    }
+    return total == 0 ? 0.0 : done / total;
+  }
 }
 
 class _PlannerScreenState extends State<PlannerScreen> {
@@ -53,31 +164,26 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   Future<void> _loadSavedPlans() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedPlansJson = prefs.getStringList('savedPlans') ?? [];
+    final list = prefs.getStringList('savedPlans') ?? [];
 
-    final loadedPlans = <PlanData>[];
-
-    for (var planStr in savedPlansJson) {
+    final loaded = <PlanData>[];
+    for (final s in list) {
       try {
-        final decoded = jsonDecode(planStr);
-
+        final decoded = jsonDecode(s);
         if (decoded is Map<String, dynamic>) {
-          // Normal PlanData
-          loadedPlans.add(PlanData.fromJson(decoded));
+          loaded.add(PlanData.fromJson(decoded));
         } else if (decoded is List) {
-          // Old data: list of DayPlan, wrap it in PlanData with default name/alarm
+          // old format: list of DayPlan objects
           final days = decoded.map((d) => DayPlan.fromJson(d)).toList();
-          loadedPlans.add(PlanData(name: "Untitled Plan", days: days));
-        } else {
-          debugPrint('Skipped unknown plan data type: $decoded');
+          loaded.add(PlanData(name: 'Untitled Plan', days: days));
         }
       } catch (e) {
-        debugPrint('Error decoding plan: $e');
+        debugPrint('Skipping invalid plan data: $e');
       }
     }
 
     setState(() {
-      savedPlans = loadedPlans;
+      savedPlans = loaded;
     });
   }
 
@@ -87,14 +193,49 @@ class _PlannerScreenState extends State<PlannerScreen> {
     await prefs.setStringList('savedPlans', jsonList);
   }
 
-  String formatMinutes(int minutes) {
-    final hours = minutes ~/ 60;
-    final mins = minutes % 60;
-    return '${hours}h ${mins}m';
+  Future<void> _setAsCurrentPlan(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    final plan = savedPlans[index];
+    await prefs.setString('currentPlan', jsonEncode(plan.toJson()));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Set as current plan')));
+    setState(() {}); // update UI
   }
 
-  Future<void> _editPlanName(PlanData plan) async {
-    final controller = TextEditingController(text: plan.name);
+  Future<void> _toggleTopicDone(
+    int planIndex,
+    int dayIndex,
+    int topicIndex,
+  ) async {
+    setState(() {
+      final t = savedPlans[planIndex].days[dayIndex].topics[topicIndex];
+      t.done = !t.done;
+    });
+    await _savePlans();
+
+    // if current plan matches this plan (by name + days dates), update currentPlan
+    final prefs = await SharedPreferences.getInstance();
+    final cur = prefs.getString('currentPlan');
+    if (cur != null) {
+      try {
+        final curDecoded = jsonDecode(cur);
+        if (curDecoded is Map<String, dynamic>) {
+          // simple compare by serialized values: if names and number of days match, update currentPlan
+          final curName = curDecoded['name'];
+          if (curName == savedPlans[planIndex].name) {
+            await prefs.setString(
+              'currentPlan',
+              jsonEncode(savedPlans[planIndex].toJson()),
+            );
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _editPlanName(int planIndex) async {
+    final controller = TextEditingController(text: savedPlans[planIndex].name);
     final result = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
@@ -116,34 +257,29 @@ class _PlannerScreenState extends State<PlannerScreen> {
       ),
     );
 
-    if (result != null && result.isNotEmpty) {
+    if (result != null && result.trim().isNotEmpty) {
       setState(() {
-        plan.name = result;
+        savedPlans[planIndex].name = result.trim();
       });
-      _savePlans();
+      await _savePlans();
     }
   }
 
-  Future<void> _editAlarmTime(PlanData plan) async {
-    TimeOfDay alarmTime = TimeOfDay(
-      hour: plan.alarmHour,
-      minute: plan.alarmMinute,
-    );
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: alarmTime,
-    );
+  Future<void> _editAlarmTime(int planIndex) async {
+    final plan = savedPlans[planIndex];
+    final initial = TimeOfDay(hour: plan.alarmHour, minute: plan.alarmMinute);
+    final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked != null) {
       setState(() {
         plan.alarmHour = picked.hour;
         plan.alarmMinute = picked.minute;
       });
-      _savePlans();
+      await _savePlans();
     }
   }
 
   Future<void> _deletePlan(int index) async {
-    final confirm = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Plan?'),
@@ -155,17 +291,28 @@ class _PlannerScreenState extends State<PlannerScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
-    if (confirm == true) {
-      setState(() {
-        savedPlans.removeAt(index);
-      });
-      _savePlans();
+    if (ok == true) {
+      setState(() => savedPlans.removeAt(index));
+      await _savePlans();
+
+      // if deleted plan was current, clear currentPlan
+      final prefs = await SharedPreferences.getInstance();
+      final cur = prefs.getString('currentPlan');
+      if (cur != null) {
+        try {
+          final curDecoded = jsonDecode(cur);
+          if (curDecoded is Map<String, dynamic> &&
+              curDecoded['name'] == savedPlans[index].name) {
+            await prefs.remove('currentPlan');
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -173,69 +320,95 @@ class _PlannerScreenState extends State<PlannerScreen> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd');
 
-    if (savedPlans.isEmpty) {
-      return const Scaffold(body: Center(child: Text("📅 No saved plans yet")));
-    }
-
     return Scaffold(
       appBar: AppBar(title: const Text('All Saved Plans')),
-      body: ListView.builder(
-        itemCount: savedPlans.length,
-        itemBuilder: (context, planIndex) {
-          final plan = savedPlans[planIndex];
-          int totalMinutes = plan.days.fold(
-            0,
-            (sum, day) => sum + day.totalMinutes,
-          );
+      body: savedPlans.isEmpty
+          ? const Center(child: Text('📅 No saved plans yet'))
+          : ListView.builder(
+              itemCount: savedPlans.length,
+              itemBuilder: (context, planIndex) {
+                final plan = savedPlans[planIndex];
+                final totalMinutes = plan.days.fold<int>(
+                  0,
+                  (s, d) => s + d.totalMinutes,
+                );
+                final progress = PlannerScreen.calculateProgress(plan);
 
-          return Card(
-            margin: const EdgeInsets.all(8),
-            child: ExpansionTile(
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${plan.name} - Total: ${formatMinutes(totalMinutes)}',
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: ExpansionTile(
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${plan.name} - ${_formatMinutes(totalMinutes)}',
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.check_circle_outline),
+                          onPressed: () => _setAsCurrentPlan(planIndex),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () => _editPlanName(planIndex),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _deletePlan(planIndex),
+                        ),
+                      ],
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
-                    onPressed: () => _editPlanName(plan),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deletePlan(planIndex),
-                  ),
-                ],
-              ),
-              subtitle: Text(
-                'Daily Alarm: ${plan.alarmHour.toString().padLeft(2, '0')}:${plan.alarmMinute.toString().padLeft(2, '0')}',
-              ),
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.access_time),
-                  title: const Text('Edit Alarm Time'),
-                  onTap: () => _editAlarmTime(plan),
-                ),
-                ...plan.days.map((day) {
-                  return ExpansionTile(
-                    title: Text(
-                      'Day ${plan.days.indexOf(day) + 1} - ${dateFormat.format(day.date)} (${formatMinutes(day.totalMinutes)})',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(value: progress, minHeight: 8),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Daily Alarm: ${plan.alarmHour.toString().padLeft(2, '0')}:${plan.alarmMinute.toString().padLeft(2, '0')}',
+                        ),
+                      ],
                     ),
-                    children: day.topics.map((t) {
-                      return ListTile(
-                        title: Text(t.name),
-                        subtitle: Text(formatMinutes(t.estimatedMinutes)),
-                      );
-                    }).toList(),
-                  );
-                }).toList(),
-              ],
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.access_time),
+                        title: const Text('Edit Alarm Time'),
+                        onTap: () => _editAlarmTime(planIndex),
+                      ),
+                      ...plan.days.asMap().entries.map((dayEntry) {
+                        final dayIndex = dayEntry.key;
+                        final day = dayEntry.value;
+                        return ExpansionTile(
+                          title: Text(
+                            'Day ${dayIndex + 1} - ${dateFormat.format(day.date)} (${_formatMinutes(day.totalMinutes)})',
+                          ),
+                          children: day.topics.asMap().entries.map((tEntry) {
+                            final topicIndex = tEntry.key;
+                            final topic = tEntry.value;
+                            return CheckboxListTile(
+                              value: topic.done,
+                              title: Text(topic.name),
+                              subtitle: Text('${topic.estimatedMinutes} min'),
+                              onChanged: (_) => _toggleTopicDone(
+                                planIndex,
+                                dayIndex,
+                                topicIndex,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
+  }
+
+  String _formatMinutes(int minutes) {
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
   }
 }

@@ -1,3 +1,4 @@
+// lib/models/plan_data.dart
 import 'plan_day.dart';
 
 class PlanData {
@@ -9,21 +10,23 @@ class PlanData {
   PlanData({
     required this.name,
     required this.days,
-    required this.alarmHour,
-    required this.alarmMinute,
+    this.alarmHour = 8,
+    this.alarmMinute = 0,
   });
 
   Map<String, dynamic> toJson() => {
     'name': name,
+    'days': days.map((d) => d.toJson()).toList(),
     'alarmHour': alarmHour,
     'alarmMinute': alarmMinute,
-    'days': days.map((d) => d.toJson()).toList(),
   };
 
   factory PlanData.fromJson(Map<String, dynamic> json) => PlanData(
     name: json['name'],
-    alarmHour: json['alarmHour'],
-    alarmMinute: json['alarmMinute'],
-    days: (json['days'] as List).map((d) => DayPlan.fromJson(d)).toList(),
+    days: (json['days'] as List<dynamic>)
+        .map((d) => DayPlan.fromJson(d))
+        .toList(),
+    alarmHour: json['alarmHour'] ?? 8,
+    alarmMinute: json['alarmMinute'] ?? 0,
   );
 }
