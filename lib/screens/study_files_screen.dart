@@ -438,7 +438,6 @@ class _StudyFilesScreenState extends State<StudyFilesScreen> {
                         onSelected: (value) {
                           if (value == 'rename') {
                             _renameFile(filePath);
-                            
                           } else if (value == 'delete') {
                             _deleteFile(filePath);
                           }
@@ -456,86 +455,6 @@ class _StudyFilesScreenState extends State<StudyFilesScreen> {
   }
 }
 
-// class FolderContentsScreen extends StatefulWidget {
-//   final StudyFolder folder;
-//   final Function saveCallback;
-//   final Function deleteFile;
-//   final Function addFile;
-//   final Function deleteFolder;
-//   final Function renameFile;
-//   final Function renameFolder;
-
-//   const FolderContentsScreen({
-//     super.key,
-//     required this.folder,
-//     required this.saveCallback,
-//     required this.deleteFile,
-//     required this.addFile,
-//     required this.deleteFolder,
-//     required this.renameFile,
-//     required this.renameFolder,
-//   });
-
-//   @override
-//   State<FolderContentsScreen> createState() => _FolderContentsScreenState();
-// }
-
-// class _FolderContentsScreenState extends State<FolderContentsScreen> {
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: Text(widget.folder.name)),
-//       body: ListView(
-//         children: [
-//           ...widget.folder.files.map(
-//             (f) => ListTile(
-//               title: Text(path.basename(f)),
-//               trailing: Row(
-//                 mainAxisSize: MainAxisSize.min,
-//                 children: [
-//                   IconButton(
-//                     icon: const Icon(Icons.open_in_new),
-//                     onPressed: () => OpenFile.open(f),
-//                   ),
-//                   PopupMenuButton(
-//                     icon: const Icon(Icons.more_vert),
-//                     itemBuilder: (_) => [
-//                       const PopupMenuItem(
-//                         value: 'rename',
-//                         child: Text('Rename'),
-//                       ),
-//                       const PopupMenuItem(
-//                         value: 'delete',
-//                         child: Text('Delete'),
-//                       ),
-//                     ],
-//                     onSelected: (value) {
-//                       if (value == 'rename') {
-//                         widget.renameFile(f, folder: widget.folder);
-//                         setState(() {});
-//                       } else if (value == 'delete') {
-//                         widget.deleteFile(f, folder: widget.folder);
-//                         setState(() {});
-//                       }
-//                     },
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//           ListTile(
-//             leading: const Icon(Icons.add),
-//             title: const Text('Add file'),
-//             onTap: () async {
-//               await widget.addFile(folder: widget.folder);
-//               setState(() {});
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 class FolderContentsScreen extends StatefulWidget {
   final StudyFolder folder;
   final Function saveCallback;
@@ -563,6 +482,8 @@ class FolderContentsScreen extends StatefulWidget {
 class _FolderContentsScreenState extends State<FolderContentsScreen> {
   @override
   Widget build(BuildContext context) {
+    final files = widget.folder.files;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.folder.name),
@@ -570,8 +491,14 @@ class _FolderContentsScreenState extends State<FolderContentsScreen> {
           PopupMenuButton(
             icon: const Icon(Icons.more_vert),
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'rename', child: Text('Rename Folder')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete Folder')),
+              const PopupMenuItem(
+                value: 'rename',
+                child: Text('Rename Folder'),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete Folder'),
+              ),
             ],
             onSelected: (value) async {
               if (value == 'rename') {
@@ -586,42 +513,93 @@ class _FolderContentsScreenState extends State<FolderContentsScreen> {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          ...widget.folder.files.map(
-            (f) => ListTile(
-              title: Text(path.basename(f)),
-              onTap: () => OpenFile.open(f), // open on single tap
-              trailing: PopupMenuButton(
-                icon: const Icon(Icons.more_vert),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'rename', child: Text('Rename')),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-                onSelected: (value) async {
-                  if (value == 'rename') {
-                    await widget.renameFile(f, folder: widget.folder);
-                    setState(() {});
-                    await widget.saveCallback();
-                  } else if (value == 'delete') {
-                    await widget.deleteFile(f, folder: widget.folder);
-                    setState(() {});
-                    await widget.saveCallback();
-                  }
-                },
+      body: GridView.builder(
+        padding: const EdgeInsets.all(12),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: files.length + 1, // +1 for "Add File" tile
+        itemBuilder: (context, index) {
+          if (index < files.length) {
+            final f = files[index];
+            return GestureDetector(
+              onTap: () => OpenFile.open(f),
+              child: Card(
+                elevation: 4,
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.insert_drive_file,
+                            size: 50,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(path.basename(f), textAlign: TextAlign.center),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: PopupMenuButton(
+                        icon: const Icon(Icons.more_vert),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: 'rename',
+                            child: Text('Rename'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Delete'),
+                          ),
+                        ],
+                        onSelected: (value) async {
+                          if (value == 'rename') {
+                            await widget.renameFile(f, folder: widget.folder);
+                            setState(() {});
+                            await widget.saveCallback();
+                          } else if (value == 'delete') {
+                            await widget.deleteFile(f, folder: widget.folder);
+                            setState(() {});
+                            await widget.saveCallback();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.add),
-            title: const Text('Add file'),
-            onTap: () async {
-              await widget.addFile(folder: widget.folder);
-              setState(() {});
-              await widget.saveCallback();
-            },
-          ),
-        ],
+            );
+          } else {
+            // Add file tile
+            return GestureDetector(
+              onTap: () async {
+                await widget.addFile(folder: widget.folder);
+                setState(() {});
+                await widget.saveCallback();
+              },
+              child: Card(
+                elevation: 4,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.add, size: 50, color: Colors.blue),
+                      SizedBox(height: 8),
+                      Text('Add File', textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+        },
       ),
     );
   }
