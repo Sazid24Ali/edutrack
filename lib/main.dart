@@ -19,7 +19,7 @@ class EduTrackApp extends StatefulWidget {
 }
 
 class _EduTrackAppState extends State<EduTrackApp> {
-  ThemeMode _themeMode = ThemeMode.dark; // default light
+  ThemeMode _themeMode = ThemeMode.light; // default light
 
   void toggleTheme(bool isDark) {
     setState(() {
